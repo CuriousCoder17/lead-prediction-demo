@@ -1,8 +1,10 @@
 import os.path
 
+import pandas as pd
 from catboost import CatBoostClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.model_selection import train_test_split
+from sklearn.utils import resample
 
 from src.core.io import read_main_data, PATH_TO_DATA_DIR
 
@@ -22,8 +24,21 @@ def train_model():
                 'LeadStatus']
     target = 'Conversion (Target)'
 
-    X = train_data[features]
-    y = train_data[target]
+    # Separate majority and minority classes
+    majority_class = train_data[train_data[target] == 0]
+    minority_class = train_data[train_data[target] == 1]
+
+    # Upsample minority class
+    minority_upsampled = resample(minority_class,
+                                  replace=True,  # sample with replacement
+                                  n_samples=len(majority_class),
+                                  # to match majority class
+                                  random_state=42)  # reproducible results
+
+    upsampled_train_data = pd.concat([majority_class, minority_upsampled])
+
+    X = upsampled_train_data[features]
+    y = upsampled_train_data[target]
 
     # Split the data into training and testing sets
     X_train, X_test, y_train, y_test = train_test_split(
@@ -46,6 +61,7 @@ def train_model():
 
     # Predict on the test set
     y_pred = model.predict(X_test)
+    print(y_pred.sum())
 
     # Evaluate the model
     accuracy = accuracy_score(y_test, y_pred)
